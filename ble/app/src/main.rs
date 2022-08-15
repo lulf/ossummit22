@@ -40,7 +40,6 @@ use nrf_softdevice::ble::gatt_server;
 use nrf_softdevice::ble::peripheral;
 use nrf_softdevice::{ble::Connection, raw, temperature_celsius, Flash, Softdevice};
 
-#[cfg(feature = "dfu")]
 use embassy_boot_nrf::FirmwareUpdater;
 
 #[cfg(feature = "panic-probe")]
@@ -102,8 +101,7 @@ async fn main(s: Spawner, p: Peripherals) {
 
     // Firmware update service event channel and task
     static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
-    #[cfg(feature = "dfu")]
-    {
+
         // The updater is the 'application' part of the bootloader that knows where bootloader
         // settings and the firmware update partition is located based on memory.x linker script.
         static DFU: Shared<FirmwareManager<Flash, 4096, 64>> = Shared::new();
@@ -121,7 +119,6 @@ async fn main(s: Spawner, p: Peripherals) {
         // Watchdog will prevent bootloader from resetting. If your application hangs for more than 5 seconds
         // (depending on bootloader config), it will enter bootloader which may swap the application back.
         s.spawn(watchdog_task()).unwrap();
-    }
 
     // Starts the bluetooth advertisement and GATT server
     s.spawn(advertiser_task(
@@ -144,17 +141,9 @@ async fn main(s: Spawner, p: Peripherals) {
     }
 }
 
-#[cfg(feature = "dfu")]
 #[nrf_softdevice::gatt_server]
 pub struct GattServer {
     pub firmware: FirmwareService,
-    pub env: EnvironmentSensingService,
-    pub device_info: DeviceInformationService,
-}
-
-#[cfg(not(feature = "dfu"))]
-#[nrf_softdevice::gatt_server]
-pub struct GattServer {
     pub env: EnvironmentSensingService,
     pub device_info: DeviceInformationService,
 }
@@ -196,7 +185,6 @@ pub async fn gatt_server_task(
                         interval.replace(Duration::from_secs(period as u64));
                     }
                 },
-                #[cfg(feature = "dfu")]
                 GattServerEvent::Firmware(e) => {
                     let _ = events.try_send(e);
                 }
