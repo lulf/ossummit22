@@ -12,15 +12,6 @@ use embassy_nrf::nvmc::Nvmc;
 #[entry]
 fn main() -> ! {
     let p = embassy_nrf::init(Default::default());
-
-    // Uncomment this if you are debugging the bootloader with debugger/RTT attached,
-    // as it prevents a hard fault when accessing flash 'too early' after boot.
-    /*
-        for i in 0..10000000 {
-            cortex_m::asm::nop();
-        }
-    */
-
     let mut bl = BootLoader::default();
     let start = bl.prepare(&mut SingleFlashProvider::new(&mut WatchdogFlash::start(
         Nvmc::new(p.NVMC),

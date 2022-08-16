@@ -6,39 +6,40 @@
 #![allow(unused_imports)]
 #![allow(unused_variables)]
 
-use drogue_device::drivers::ble::gatt::{
-    device_info::{DeviceInformationService, DeviceInformationServiceEvent},
-    environment::*,
-};
-use drogue_device::shared::Shared;
-use drogue_device::traits::led::ToFrame;
-use drogue_device::Board;
-use drogue_device::{bsp::boards::nrf52::microbit::Microbit, domain::led::matrix::Brightness};
 use drogue_device::{
-    drivers::ble::gatt::dfu::{FirmwareGattService, FirmwareService, FirmwareServiceEvent},
+    bsp::boards::nrf52::microbit::Microbit,
+    domain::led::matrix::Brightness,
+    drivers::ble::gatt::{
+        device_info::{DeviceInformationService, DeviceInformationServiceEvent},
+        dfu::{FirmwareGattService, FirmwareService, FirmwareServiceEvent},
+        environment::*,
+    },
     firmware::{FirmwareManager, SharedFirmwareManager},
+    shared::Shared,
+    traits::led::ToFrame,
+    Board,
 };
-use embassy::blocking_mutex::raw::ThreadModeRawMutex;
-use embassy::channel::mpmc::{Channel, DynamicReceiver, DynamicSender};
-use embassy::executor::Spawner;
-use embassy::time::Delay;
-use embassy::time::Ticker;
-use embassy::time::{Duration, Timer};
-use embassy::util::Forever;
-use embassy::util::{select, Either};
-use embassy_nrf::config::Config;
-use embassy_nrf::interrupt::Priority;
+use embassy::{
+    blocking_mutex::raw::ThreadModeRawMutex,
+    channel::mpmc::{Channel, DynamicReceiver, DynamicSender},
+    executor::Spawner,
+    time::{Delay, Duration, Ticker, Timer},
+    util::{select, Either, Forever},
+};
 use embassy_nrf::{
     buffered_uarte::{BufferedUarte, State},
+    config::Config,
     interrupt,
+    interrupt::Priority,
     peripherals::{TIMER0, UARTE0},
     uarte, Peripherals,
 };
 use futures::StreamExt;
 use heapless::Vec;
-use nrf_softdevice::ble::gatt_server;
-use nrf_softdevice::ble::peripheral;
-use nrf_softdevice::{ble::Connection, raw, temperature_celsius, Flash, Softdevice};
+use nrf_softdevice::{
+    ble::{gatt_server, peripheral, Connection},
+    raw, temperature_celsius, Flash, Softdevice,
+};
 
 use embassy_boot_nrf::FirmwareUpdater;
 
@@ -102,23 +103,22 @@ async fn main(s: Spawner, p: Peripherals) {
     // Firmware update service event channel and task
     static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
 
-        // The updater is the 'application' part of the bootloader that knows where bootloader
-        // settings and the firmware update partition is located based on memory.x linker script.
-        static DFU: Shared<FirmwareManager<Flash, 4096, 64>> = Shared::new();
-        let dfu = DFU.initialize(FirmwareManager::new(
-            Flash::take(sd),
-            FirmwareUpdater::default(),
-            version.as_bytes(),
-        ));
-        let updater =
-            FirmwareGattService::new(&server.firmware, dfu.clone(), version.as_bytes(), 64)
-                .unwrap();
-        s.spawn(updater_task(updater, EVENTS.receiver().into()))
-            .unwrap();
+    // The updater is the 'application' part of the bootloader that knows where bootloader
+    // settings and the firmware update partition is located based on memory.x linker script.
+    static DFU: Shared<FirmwareManager<Flash, 4096, 64>> = Shared::new();
+    let dfu = DFU.initialize(FirmwareManager::new(
+        Flash::take(sd),
+        FirmwareUpdater::default(),
+        version.as_bytes(),
+    ));
+    let updater =
+        FirmwareGattService::new(&server.firmware, dfu.clone(), version.as_bytes(), 64).unwrap();
+    s.spawn(updater_task(updater, EVENTS.receiver().into()))
+        .unwrap();
 
-        // Watchdog will prevent bootloader from resetting. If your application hangs for more than 5 seconds
-        // (depending on bootloader config), it will enter bootloader which may swap the application back.
-        s.spawn(watchdog_task()).unwrap();
+    // Watchdog will prevent bootloader from resetting. If your application hangs for more than 5 seconds
+    // (depending on bootloader config), it will enter bootloader which may swap the application back.
+    s.spawn(watchdog_task()).unwrap();
 
     // Starts the bluetooth advertisement and GATT server
     s.spawn(advertiser_task(
