@@ -38,15 +38,17 @@ opt-level = 0
 overflow-checks = false
 
 [patch.crates-io]
-drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "bca1c7915f8c24e3974a91a068202868c0c20346" }
+drogue-device = { git = "https://github.com/drogue-iot/drogue-device.git", rev = "fb8a9894d6c1d3871824e51b8a7665ec55127112" }
 #drogue-device = { path = "/home/lulf/dev/drogue-iot/drogue-device/device" }
-embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "de7dd59fa9553a1a6b75ff09238c9529277b95e7" }
-embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "de7dd59fa9553a1a6b75ff09238c9529277b95e7" }
-embassy-boot = { git = "https://github.com/embassy-rs/embassy.git", rev = "de7dd59fa9553a1a6b75ff09238c9529277b95e7" }
-embassy-boot-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "de7dd59fa9553a1a6b75ff09238c9529277b95e7" }
-nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "c584deaf9d9e941f18457934a4a463e078f380ec" }
-nrf-softdevice-s113 = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "c584deaf9d9e941f18457934a4a463e078f380ec" }
-nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "c584deaf9d9e941f18457934a4a463e078f380ec" }
+embassy = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+embassy-embedded-hal = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+embassy-hal-common = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+embassy-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+embassy-boot = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+embassy-boot-nrf = { git = "https://github.com/embassy-rs/embassy.git", rev = "6baddaf53982b75149cb7e91280c571f7fe2" }
+nrf-softdevice = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "a5026485151138112b522a27c4a340614d7a7512" }
+nrf-softdevice-s113 = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "a5026485151138112b522a27c4a340614d7a7512" }
+nrf-softdevice-defmt-rtt = { git = "https://github.com/embassy-rs/nrf-softdevice.git", rev = "a5026485151138112b522a27c4a340614d7a7512" }
 
 #embassy = { path = "../../../../../../embassy/embassy" }
 #embassy-nrf = { path = "../../../../../../embassy/embassy-nrf" }
