@@ -1,0 +1,14 @@
+spec:
+  firmware:
+    container:
+      image: "microbit:main"
+      build:
+        image: "image-registry.openshift-image-registry.svc:5000/drogue-ajour/rust-firmware-builder:latest"
+        source:
+          git:
+            rev: "b"
+            uri: "https://github.com/lulf/ossummit22"
+            project: "firmware/application"
+        timeout: "1h0m0s"
+        artifact:
+          path: "firmware.bin"
