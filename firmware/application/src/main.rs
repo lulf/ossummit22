@@ -3,6 +3,8 @@
 #![macro_use]
 #![feature(generic_associated_types)]
 #![feature(type_alias_impl_trait)]
+#![allow(unused_imports)]
+#![allow(unused_variables)]
 
 use drogue_device::{
     bsp::boards::nrf52::microbit::Microbit,
@@ -12,25 +14,34 @@ use drogue_device::{
         dfu::{FirmwareGattService, FirmwareService, FirmwareServiceEvent},
         environment::*,
     },
-    firmware::FirmwareManager,
+    firmware::{FirmwareManager, SharedFirmwareManager},
+    shared::Shared,
     traits::led::ToFrame,
     Board,
 };
 use embassy::{
     blocking_mutex::raw::ThreadModeRawMutex,
-    channel::{Channel, DynamicReceiver, DynamicSender},
+    channel::mpmc::{Channel, DynamicReceiver, DynamicSender},
     executor::Spawner,
-    time::{Duration, Ticker, Timer},
+    time::{Delay, Duration, Ticker, Timer},
     util::{select, Either, Forever},
 };
-use embassy_boot_nrf::updater;
-use embassy_nrf::{config::Config, interrupt::Priority, Peripherals};
+use embassy_nrf::{
+    buffered_uarte::{BufferedUarte, State},
+    config::Config,
+    interrupt,
+    interrupt::Priority,
+    peripherals::{TIMER0, UARTE0},
+    uarte, Peripherals,
+};
 use futures::StreamExt;
 use heapless::Vec;
 use nrf_softdevice::{
     ble::{gatt_server, peripheral, Connection},
     raw, temperature_celsius, Flash, Softdevice,
 };
+
+use embassy_boot_nrf::FirmwareUpdater;
 
 #[cfg(feature = "panic-probe")]
 use panic_probe as _;
@@ -57,22 +68,18 @@ async fn main(s: Spawner, p: Peripherals) {
     let board = Microbit::new(p);
 
     // Spawn the underlying softdevice task
-    let sd = enable_softdevice("oss-summit-22");
+    let sd = enable_softdevice("Drogue Low Energy");
     s.spawn(softdevice_task(sd)).unwrap();
 
     let version = FIRMWARE_REVISION.unwrap_or(FIRMWARE_VERSION);
     defmt::info!("Running firmware version {}", version);
-
-    // Watchdog will prevent bootloader from resetting. If your application hangs for more than 5 seconds
-    // (depending on bootloader config), it will enter bootloader which may swap the application back.
-    s.spawn(watchdog_task()).unwrap();
 
     // Create a BLE GATT server and make it static
     static GATT: Forever<GattServer> = Forever::new();
     let server = GATT.put(gatt_server::register(sd).unwrap());
     server
         .device_info
-        .initialize(b"OSS Summit 2022", b"1.0", b"Red Hat", b"1.0")
+        .initialize(b"Drogue Low Energy", b"1.0", b"Red Hat", b"1.0")
         .unwrap();
     server
         .env
@@ -93,14 +100,24 @@ async fn main(s: Spawner, p: Peripherals) {
         .trigger_set(TriggerSetting::FixedInterval(5).to_vec())
         .unwrap();
 
-    // Fiwmare update service event channel and task
+    // Firmware update service event channel and task
     static EVENTS: Channel<ThreadModeRawMutex, FirmwareServiceEvent, 10> = Channel::new();
     // The updater is the 'application' part of the bootloader that knows where bootloader
     // settings and the firmware update partition is located based on memory.x linker script.
-    let dfu = FirmwareManager::new(Flash::take(sd), updater::new());
-    let updater = FirmwareGattService::new(&server.firmware, dfu, version.as_bytes(), 64).unwrap();
+    static DFU: Shared<FirmwareManager<Flash, 4096, 64>> = Shared::new();
+    let dfu = DFU.initialize(FirmwareManager::new(
+        Flash::take(sd),
+        FirmwareUpdater::default(),
+        version.as_bytes(),
+    ));
+    let updater =
+        FirmwareGattService::new(&server.firmware, dfu.clone(), version.as_bytes(), 64).unwrap();
     s.spawn(updater_task(updater, EVENTS.receiver().into()))
         .unwrap();
+
+    // Watchdog will prevent bootloader from resetting. If your application hangs for more than 5 seconds
+    // (depending on bootloader config), it will enter bootloader which may swap the application back.
+    s.spawn(watchdog_task()).unwrap();
 
     // Starts the bluetooth advertisement and GATT server
     s.spawn(advertiser_task(
@@ -108,7 +125,7 @@ async fn main(s: Spawner, p: Peripherals) {
         sd,
         server,
         EVENTS.sender().into(),
-        "oss-summit-22",
+        "Drogue Low Energy",
     ))
     .unwrap();
 
@@ -117,7 +134,7 @@ async fn main(s: Spawner, p: Peripherals) {
     display.set_brightness(Brightness::MAX);
     loop {
         let _ = display
-            .display('B'.to_frame(), Duration::from_secs(1))
+            .display('A'.to_frame(), Duration::from_secs(1))
             .await;
         Timer::after(Duration::from_secs(1)).await;
     }
@@ -132,7 +149,7 @@ pub struct GattServer {
 
 #[embassy::task]
 pub async fn updater_task(
-    mut dfu: FirmwareGattService<'static, FirmwareManager<Flash>>,
+    mut dfu: FirmwareGattService<'static, SharedFirmwareManager<'static, Flash, 4096, 64>>,
     events: DynamicReceiver<'static, FirmwareServiceEvent>,
 ) {
     loop {
@@ -185,7 +202,7 @@ pub async fn gatt_server_task(
             Either::Second(_) => {
                 let value: i8 = temperature_celsius(sd).unwrap().to_num();
                 defmt::info!("Measured temperature: {}℃", value);
-                let value = value as i16;
+                let value = value as i16 * 10;
 
                 env_service.temperature_set(value).unwrap();
                 if notify {
